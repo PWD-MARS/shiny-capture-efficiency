@@ -1,12 +1,15 @@
 #Capture Efficiency Test (CET) tabs
-#This has a tab dropdown with two tabs, one for adding CETs and one for viewing all CETs
+#This has a tab dropdown with three tabs, one for adding CETs and one for viewing all CETs one for viewing future CETs
 
+#1.0 UI -------
 capture_efficiencyUI <- function(id, label = "capture_efficiency", high_flow_type, priority, html_req, con_phase, future_req, cet_asset_type){
   ns <- NS(id)
   navbarPage("CET", theme = shinytheme("cerulean"), id = "inTabset",
+             #1.1 Add / Edit -------
              tabPanel("Add/Edit Capture Efficiency Test", value = "cet_tab", 
                       useShinyjs(),
                       titlePanel("Add/Edit Capture Efficiency Test (CET)"), 
+                      #1.1.1 sidebarPanel----
                       sidebarPanel(
                         selectizeInput(ns("system_id"), future_req(html_req("System ID")), 
                                        choices = NULL, 
@@ -46,6 +49,7 @@ capture_efficiencyUI <- function(id, label = "capture_efficiency", high_flow_typ
                           HTML(paste(html_req(""), " indicates required field for complete tests. ", future_req(""), " indicates required field for future tests.")))
                       ), 
                       mainPanel(
+                        #1.1.2 main panel /tables ------
                         conditionalPanel(condition = "input.system_id", 
                                          ns  = ns, 
                         h4(textOutput(ns("future_header"))), #("Capture Efficiency Tests at this SMP"), 
@@ -56,21 +60,26 @@ capture_efficiencyUI <- function(id, label = "capture_efficiency", high_flow_typ
                                 h6("2) If no hydrant is nearby to test high flow, efficiency is simply predicted"), 
                                 h6("3) High flow uisng nearby hydrant, flow estimated at 20-25 CFM"))
              ),
+             #1.2 View all -----
              tabPanel("View Capture Efficiency Tests", value = "view_cet", 
                       titlePanel("All Capture Efficiency Tests"), 
                       DTOutput(ns("all_cet_table"))
              ), 
+             #1.3 view future --------
              tabPanel("View Future Capture Efficiency Tests", value = "view_future_cet", 
                       titlePanel("All Future Capture Efficiency Tests"), 
                       DTOutput(ns("all_future_cet_table")))
   )
 }
 
+#2.0 Server ---------
+
 capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_type, con_phase, cet_asset_type, sys_id, special_char_replace){
   
   moduleServer(id, 
                function(input, output, session){
   
+      #2.0.1 set up --------
       #define ns to use in modals
       ns <- session$ns
       
@@ -88,6 +97,8 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       #   }
       # })
       
+      #2.1 Add/Edit -----
+      #2.1.1 Headers ------
       #Get the Project name, combine it with System ID, and create a reactive header
       rv$sys_and_name_step <- reactive(odbc::dbGetQuery(poolConn, paste0("select system_id, project_name from project_names where system_id = '", input$system_id, "'")))
       
@@ -101,6 +112,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         paste("Future Capture Efficiency Tests at", rv$sys_and_name())
       )
       
+      #2.1.2 Querying component IDs ------
       #adjust query to accurately target NULL values once back on main server
       rv$component_and_asset_query <- reactive(paste0("SELECT component_id, asset_type FROM smpid_facilityid_componentid_inlets_limited WHERE system_id = '", input$system_id, "' AND component_id != 'NULL'"))
       rv$component_and_asset <- reactive(odbc::dbGetQuery(poolConn, rv$component_and_asset_query()))
@@ -135,38 +147,11 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       observe(updateSelectInput(session, "facility_id", selected = rv$facility_id()))
     
+      #2.1.3 preparing inputs -----
       #lookup priority uid
       rv$priority_lookup_uid_query <- reactive(paste0("select field_test_priority_lookup_uid from fieldwork.field_test_priority_lookup where field_test_priority = '", input$priority, "'"))
       rv$priority_lookup_uid_step <- reactive(dbGetQuery(poolConn, rv$priority_lookup_uid_query()))
       rv$priority_lookup_uid <- reactive(if(nchar(input$priority) == 0) "NULL" else paste0("'", rv$priority_lookup_uid_step(), "'"))
-      
-      #get the table of CETs
-      rv$cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full WHERE system_id = '", input$system_id, "'"))
-      rv$cet_table_db <- reactive(dbGetQuery(poolConn, rv$cet_table_query()))
-      rv$cet_table <- reactive(rv$cet_table_db() %>% 
-                                 mutate(across(test_date, as.Date)) %>% 
-                                 mutate(across(low_flow_bypass_observed,  
-                                           ~ case_when(. == 1 ~ "Yes", 
-                                                          . == 0 ~ "No"))) %>% 
-                                 dplyr::select(-1) %>% 
-                                 dplyr::select(-"facility_id", -"project_name", -"system_id", -"public"))
-      
-      #enable/disable buttons 
-      #conditions need to be set up this way; changing them all to nchar, or all to length, or all to input != "" won't work
-      observe(toggleState(id = "add_cet", condition = nchar(input$system_id) > 0 & length(input$cet_date) > 0 & 
-                            (nchar(input$cet_comp_id) >0 | nchar(input$cet_comp_id_custom) > 0) & nchar(input$con_phase) > 0) &
-                length(input$low_flow_bypass) > 0 & length(input$low_flow_efficiency) > 0)
-      
-      #if one of the component id's is filled out, disable the other
-      observe(toggleState(id = "cet_comp_id_custom", condition = input$cet_comp_id == ""))
-      
-      observe(toggleState(id = "cet_comp_id", condition = input$cet_comp_id_custom == ""))
-      
-      #toggle state for future cet
-      observe(toggleState(id = "future_cet", condition = nchar(input$system_id) > 0 & (nchar(input$cet_comp_id) > 0 | nchar(input$cet_comp_id_custom) > 0)))
-      
-      #toggle future deployment delete button
-      observe(toggleState(id = "delete_future_cet", condition = length(input$future_cet_table_rows_selected) != 0))
       
       #change type from text to uid
       rv$est_high_flow_efficiency <- reactive(high_flow_type %>% dplyr::filter(est_high_flow_efficiency == input$est_high_flow_efficiency) %>% 
@@ -184,12 +169,41 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       }
       )
       
-      #toggle state for data depending on whether a test date is included
-      observe(toggleState(id = "low_flow_bypass", condition = length(input$cet_date) > 0))
-      observe(toggleState(id = "low_flow_efficiency", condition = length(input$cet_date) > 0))
-      #toggle state based on test date and whether est OR real is filled out
-      observe(toggleState(id = "est_high_flow_efficiency", condition = length(input$cet_date) > 0 & is.na(input$high_flow_efficiency)))
-      observe(toggleState(id = "high_flow_efficiency", condition = length(input$cet_date) > 0 &  nchar(input$est_high_flow_efficiency) == 0))
+      #set inputs to reactive values so "NULL" can be entered
+      #important to correctly place quotations
+      #replace quotes with double quotes to protect against SQL injections
+      rv$est_hfe <- reactive(if(length(rv$est_high_flow_efficiency()) == 0) "NULL" else paste0("'", rv$est_high_flow_efficiency(), "'"))
+      rv$cet_notes_step <- reactive(gsub('\'', '\'\'', input$cet_notes))
+      rv$cet_notes_step_two <- reactive(special_char_replace(rv$cet_notes_step()))
+      rv$cet_notes <- reactive(if(nchar(rv$cet_notes_step_two()) == 0) "NULL" else paste0("'", rv$cet_notes_step_two(), "'"))
+      
+      rv$low_flow_bypass <- reactive(if(nchar(input$low_flow_bypass) == 0 | input$low_flow_bypass == "N/A") "NULL" else paste0("'", input$low_flow_bypass, "'"))
+      rv$low_flow_efficiency <- reactive(if(is.na(input$low_flow_efficiency)) "NULL" else paste0("'", input$low_flow_efficiency, "'"))
+      rv$high_flow_efficiency <- reactive(if(is.na(input$high_flow_efficiency)) "NULL" else paste0("'", input$high_flow_efficiency, "'"))
+      
+      #pick a component ID
+      #protect against SQL injection
+      rv$cet_comp_id_custom_step <- reactive(gsub('\'', '\'\'', input$cet_comp_id_custom))
+      rv$cet_comp_id_custom <- reactive(if(nchar(rv$cet_comp_id_custom_step()) == 0) "NULL" else paste0("'", rv$cet_comp_id_custom_step(), "'"))
+      
+      rv$cet_comp_id <- reactive(if(nchar(input$cet_comp_id) > 0){
+        paste0("'",rv$select_component_id(), "'")
+      }else{
+        rv$cet_comp_id_custom()
+      })
+      
+      
+      #2.1.4 query and show tables -----
+      #get the table of CETs
+      rv$cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full WHERE system_id = '", input$system_id, "'"))
+      rv$cet_table_db <- reactive(dbGetQuery(poolConn, rv$cet_table_query()))
+      rv$cet_table <- reactive(rv$cet_table_db() %>% 
+                                 mutate(across(test_date, as.Date)) %>% 
+                                 mutate(across(low_flow_bypass_observed,  
+                                           ~ case_when(. == 1 ~ "Yes", 
+                                                          . == 0 ~ "No"))) %>% 
+                                 dplyr::select(-1) %>% 
+                                 dplyr::select(-"facility_id", -"project_name", -"system_id", -"public"))
       
       output$cet_table <- renderDT(
         datatable(rv$cet_table(), 
@@ -224,6 +238,52 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         ),
       )
       
+      #2.1.5 toggle states based on inputs ------
+      #enable/disable buttons 
+      #conditions need to be set up this way; changing them all to nchar, or all to length, or all to input != "" won't work
+      observe(toggleState(id = "add_cet", condition = nchar(input$system_id) > 0 & length(input$cet_date) > 0 & 
+                            (nchar(input$cet_comp_id) >0 | nchar(input$cet_comp_id_custom) > 0) & nchar(input$con_phase) > 0) &
+                length(input$low_flow_bypass) > 0 & length(input$low_flow_efficiency) > 0)
+      
+      #if one of the component id's is filled out, disable the other
+      observe(toggleState(id = "cet_comp_id_custom", condition = input$cet_comp_id == ""))
+      
+      observe(toggleState(id = "cet_comp_id", condition = input$cet_comp_id_custom == ""))
+      
+      #toggle state for future cet
+      observe(toggleState(id = "future_cet", condition = nchar(input$system_id) > 0 & (nchar(input$cet_comp_id) > 0 | nchar(input$cet_comp_id_custom) > 0)))
+      
+      #toggle future deployment delete button
+      observe(toggleState(id = "delete_future_cet", condition = length(input$future_cet_table_rows_selected) != 0))
+      
+      #toggle state for data depending on whether a test date is included
+      observe(toggleState(id = "low_flow_bypass", condition = length(input$cet_date) > 0))
+      observe(toggleState(id = "low_flow_efficiency", condition = length(input$cet_date) > 0))
+      #toggle state based on test date and whether est OR real is filled out
+      observe(toggleState(id = "est_high_flow_efficiency", condition = length(input$cet_date) > 0 & is.na(input$high_flow_efficiency)))
+      observe(toggleState(id = "high_flow_efficiency", condition = length(input$cet_date) > 0 &  nchar(input$est_high_flow_efficiency) == 0))
+      
+      #set efficiency = 100 if bypass = no, and disable field
+      observeEvent(input$low_flow_bypass, {
+        if(input$low_flow_bypass == 0){
+          updateNumericInput(session, "low_flow_efficiency", value = 100)
+          disable("low_flow_efficiency")
+        }else if(nchar(input$low_flow_bypass) == 0){
+          disable("low_flow_efficiency")
+        }else{
+          enable("low_flow_efficiency")
+          reset("low_flow_efficiency")
+        }
+      })
+      
+      #2.1.5.1 add/edit button label toggle ------
+      rv$label <- reactive(if(length(input$cet_table_rows_selected) == 0) "Add New" else "Edit Selected")
+      observe(updateActionButton(session, "add_cet", label = rv$label()))
+      
+      rv$future_label <- reactive(if(length(input$future_cet_table_rows_selected) == 0) "Add Future Capture Efficiency Test" else "Edit Selected Future CET")
+      observe(updateActionButton(session, "future_cet", label = rv$future_label()))
+      
+      #2.1.6 Edit / prefill fields on click -------
       #on click
       observeEvent(input$future_cet_table_rows_selected, {
         #deselect from other table
@@ -264,7 +324,6 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         reset("est_high_flow_efficiency")
         reset("high_flow_efficiency")
       })
-      
       
       observeEvent(input$cet_table_rows_selected, {
         
@@ -308,50 +367,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         updateTextAreaInput(session, "cet_notes", value = rv$cet_table_db()$notes[input$cet_table_rows_selected])
       })
       
-      
-      #set inputs to reactive values so "NULL" can be entered
-      #important to correctly place quotations
-      #replace quotes with double quotes to protect against SQL injections
-      rv$est_hfe <- reactive(if(length(rv$est_high_flow_efficiency()) == 0) "NULL" else paste0("'", rv$est_high_flow_efficiency(), "'"))
-      rv$cet_notes_step <- reactive(gsub('\'', '\'\'', input$cet_notes))
-      rv$cet_notes_step_two <- reactive(special_char_replace(rv$cet_notes_step()))
-      rv$cet_notes <- reactive(if(nchar(rv$cet_notes_step_two()) == 0) "NULL" else paste0("'", rv$cet_notes_step_two(), "'"))
-      
-      rv$low_flow_bypass <- reactive(if(nchar(input$low_flow_bypass) == 0 | input$low_flow_bypass == "N/A") "NULL" else paste0("'", input$low_flow_bypass, "'"))
-      rv$low_flow_efficiency <- reactive(if(is.na(input$low_flow_efficiency)) "NULL" else paste0("'", input$low_flow_efficiency, "'"))
-      rv$high_flow_efficiency <- reactive(if(is.na(input$high_flow_efficiency)) "NULL" else paste0("'", input$high_flow_efficiency, "'"))
-      
-      #pick a component ID
-      #protect against SQL injection
-      rv$cet_comp_id_custom_step <- reactive(gsub('\'', '\'\'', input$cet_comp_id_custom))
-      rv$cet_comp_id_custom <- reactive(if(nchar(rv$cet_comp_id_custom_step()) == 0) "NULL" else paste0("'", rv$cet_comp_id_custom_step(), "'"))
-      
-      rv$cet_comp_id <- reactive(if(nchar(input$cet_comp_id) > 0){
-        paste0("'",rv$select_component_id(), "'")
-      }else{
-         rv$cet_comp_id_custom()
-      })
-      
-      #add/edit button toggle
-      rv$label <- reactive(if(length(input$cet_table_rows_selected) == 0) "Add New" else "Edit Selected")
-      observe(updateActionButton(session, "add_cet", label = rv$label()))
-      
-      rv$future_label <- reactive(if(length(input$future_cet_table_rows_selected) == 0) "Add Future Capture Efficiency Test" else "Edit Selected Future CET")
-      observe(updateActionButton(session, "future_cet", label = rv$future_label()))
-      
-      #set efficiency = 100 if bypass = no, and disable field
-      observeEvent(input$low_flow_bypass, {
-        if(input$low_flow_bypass == 0){
-          updateNumericInput(session, "low_flow_efficiency", value = 100)
-          disable("low_flow_efficiency")
-        }else if(nchar(input$low_flow_bypass) == 0){
-          disable("low_flow_efficiency")
-        }else{
-          enable("low_flow_efficiency")
-          reset("low_flow_efficiency")
-        }
-      })
-      
+      #2.1.7 Add/Edit/Delete/Clear -------
       #add and edit future capture efficiency records
       observeEvent(input$future_cet, {
         if(length(input$future_cet_table_rows_selected) == 0){
@@ -490,8 +506,8 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         removeModal()
       })
       
-      # View all CETs ----
-      
+      #2.2 View all CETs ----
+      #2.2.1 Query and show tables -----
       rv$all_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full ORDER BY test_date DESC"))
       rv$all_cet_table_db <- reactive(dbGetQuery(poolConn, rv$all_query())) 
       rv$all_cet_table <- reactive(rv$all_cet_table_db() %>% 
@@ -518,6 +534,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         )
       )
       
+      #2.2.2 click a row ----
       #update system id and change tabs
       #then once the system id is updated, select a test from a table
       #this is delayed so it happens in order
@@ -532,7 +549,9 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         })
       })
       
-      #View all Future CETs
+      #2.3 View all Future CETs -----
+      
+      #2.3.1 query and show table ------
       #unclear why some things need to have () / be reactive and some don't but this works
       rv$all_future_cet_query <- "SELECT * FROM fieldwork.future_capture_efficiency_full order by field_test_priority_lookup_uid"
       rv$all_future_cet_table_db <- reactive(odbc::dbGetQuery(poolConn, rv$all_future_cet_query))
@@ -555,6 +574,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         )
       )
       
+      #2.3.2 click a row -------
       #update system id and change tabs
       #then once the system id is updated, select a test from a table
       #this is delayed so it happens in order
