@@ -100,7 +100,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       #2.1 Add/Edit -----
       #2.1.1 Headers ------
       #Get the Project name, combine it with System ID, and create a reactive header
-      rv$sys_and_name_step <- reactive(odbc::dbGetQuery(poolConn, paste0("select system_id, project_name from project_names where system_id = '", input$system_id, "'")))
+      rv$sys_and_name_step <- reactive(odbc::dbGetQuery(poolConn, paste0("select system_id, project_name from fieldwork.project_names where system_id = '", input$system_id, "'")))
       
       rv$sys_and_name <- reactive(paste(rv$sys_and_name_step()$system_id[1], rv$sys_and_name_step()$project_name[1]))
       
@@ -114,7 +114,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.1.2 Querying component IDs ------
       #adjust query to accurately target NULL values once back on main server
-      rv$component_and_asset_query <- reactive(paste0("SELECT component_id, asset_type FROM smpid_facilityid_componentid_inlets_limited WHERE system_id = '", input$system_id, "' AND component_id != 'NULL'"))
+      rv$component_and_asset_query <- reactive(paste0("SELECT component_id, asset_type FROM external.assets_cet WHERE system_id = '", input$system_id, "' AND component_id != 'NULL'"))
       rv$component_and_asset <- reactive(odbc::dbGetQuery(poolConn, rv$component_and_asset_query()))
       
       rv$asset_comp <- reactive(rv$component_and_asset() %>% 
@@ -137,9 +137,9 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       #get facility ID. Either use SMP footprint (for an unknown component) or the facility ID of the existing component
       rv$facility_id <- reactive(if(input$cet_comp_id != ""){
             odbc::dbGetQuery(poolConn, paste0(
-              "SELECT facility_id from smpid_facilityid_componentid_inlets_limited WHERE component_id = '", rv$select_component_id(), "'"))[1,1]
+              "SELECT facility_id from external.assets_cet WHERE component_id = '", rv$select_component_id(), "'"))[1,1]
       }else if(input$system_id != ""){
-        odbc::dbGetQuery(poolConn, paste0("SELECT facility_id from smpid_facilityid_componentid_inlets_limited WHERE component_id is NULL and system_id = '", input$system_id, "' LIMIT 1"))
+        odbc::dbGetQuery(poolConn, paste0("SELECT facility_id from external.assets_cet WHERE component_id is NULL and system_id = '", input$system_id, "' LIMIT 1"))
       }else{
         ""
       }
@@ -298,7 +298,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         
         #get facility id
         rv$future_fac <- rv$future_cet_table_db()$facility_id[input$future_cet_table_rows_selected]
-        future_comp_id_query <- paste0("select distinct component_id from smpid_facilityid_componentid_inlets_limited where facility_id = '", rv$future_fac, "' 
+        future_comp_id_query <- paste0("select distinct component_id from external.assets_cet where facility_id = '", rv$future_fac, "' 
             AND component_id IS NOT NULL")
         
         f_comp_id_step <- odbc::dbGetQuery(poolConn, future_comp_id_query) %>% pull()
@@ -334,7 +334,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         #get facility id from table
         rv$fac <- (rv$cet_table_db()$facility_id[input$cet_table_rows_selected])
         #get component id
-        comp_id_query <- paste0("select distinct component_id from smpid_facilityid_componentid_inlets_limited where facility_id = '", rv$fac, "' 
+        comp_id_query <- paste0("select distinct component_id from external.assets_cet where facility_id = '", rv$fac, "' 
             AND component_id IS NOT NULL")
         comp_id_step <- odbc::dbGetQuery(poolConn, comp_id_query) %>% pull()
         #determine whether component id exists and is useful
@@ -361,9 +361,11 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         updateDateInput(session, "cet_date", value = rv$cet_table_db()$test_date[input$cet_table_rows_selected])
         updateSelectInput(session, "con_phase", selected = rv$cet_table_db()$phase[input$cet_table_rows_selected])
         updateSelectInput(session, "low_flow_bypass", selected = rv$cet_table_db()$low_flow_bypass_observed[input$cet_table_rows_selected])
-        updateNumericInput(session, "low_flow_efficiency", value = rv$cet_table_db()$low_flow_efficiency_pct[input$cet_table_rows_selected])
+        delay(250, 
+        updateNumericInput(session, "low_flow_efficiency", value = rv$cet_table_db()$low_flow_efficiency_pct[input$cet_table_rows_selected]))
         updateSelectInput(session, "est_high_flow_efficiency", selected = rv$cet_table()$est_high_flow_efficiency[input$cet_table_rows_selected])
-        updateNumericInput(session, "high_flow_efficiency", value = rv$cet_table_db()$high_flow_efficiency_pct[input$cet_table_rows_selected])
+        delay(250, 
+          updateNumericInput(session, "high_flow_efficiency", value = rv$cet_table_db()$high_flow_efficiency_pct[input$cet_table_rows_selected]))
         updateTextAreaInput(session, "cet_notes", value = rv$cet_table_db()$notes[input$cet_table_rows_selected])
       })
       

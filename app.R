@@ -31,7 +31,7 @@ options(DT.options = list(pageLength = 15))
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
-poolConn <- dbPool(odbc(), dsn = "mars_testing", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+poolConn <- dbPool(odbc(), dsn = "mars_data", uid = Sys.getenv("new_shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
 #disconnect from db on stop 
 onStop(function(){
@@ -59,7 +59,7 @@ ui <- function(req){
   high_flow_type <- dbGetQuery(poolConn, "select * from fieldwork.est_high_flow_efficiency_lookup")
   
   #capture efficiency asset types 
-  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from smpid_facilityid_componentid_inlets_limited where component_id is not null order by asset_type") 
+  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from external.assets_cet where component_id is not null order by asset_type") 
   
   #construction phase types
   con_phase <- dbGetQuery(poolConn, "select * from fieldwork.con_phase_lookup")
@@ -106,13 +106,13 @@ server <- function(input, output, session) {
   high_flow_type <- dbGetQuery(poolConn, "select * from fieldwork.est_high_flow_efficiency_lookup")
   
   #capture efficiency asset types 
-  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from smpid_facilityid_componentid_inlets_limited where component_id is not null order by asset_type")
+  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from external.assets_cet where component_id is not null order by asset_type")
   
   #con phase
   con_phase <- dbGetQuery(poolConn, "select * from fieldwork.con_phase_lookup")
   
   #all system ids
-  sys_id <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from smpid_facilityid_componentid")) %>% 
+  sys_id <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from external.assets")) %>% 
     dplyr::arrange(system_id) %>% 
     dplyr::pull()
   
