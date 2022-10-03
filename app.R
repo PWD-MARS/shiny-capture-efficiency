@@ -56,13 +56,13 @@ ui <- function(req){
   #define global variables that will be required each time the UI runs
   
   # #capture efficiency high flow types
-  high_flow_type <- dbGetQuery(poolConn, "select * from fieldwork.est_high_flow_efficiency_lookup")
+  high_flow_type <- dbGetQuery(poolConn, "select * from fieldwork.tbl_est_high_flow_efficiency_lookup")
   
   #capture efficiency asset types 
-  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from smpid_facilityid_componentid_inlets_limited where component_id is not null order by asset_type") 
+  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from external.mat_assets_ict_limited where component_id is not null order by asset_type") 
   
   #construction phase types
-  con_phase <- dbGetQuery(poolConn, "select * from fieldwork.con_phase_lookup")
+  con_phase <- dbGetQuery(poolConn, "select * from fieldwork.tbl_con_phase_lookup")
   
   #this function adds a little red star to indicate that a field is required. It uses HTML, hence "html_req"
   html_req <- function(label){
@@ -75,7 +75,7 @@ ui <- function(req){
   }
   
   #field test priority
-  priority <- dbGetQuery(poolConn, "select * from fieldwork.field_test_priority_lookup")
+  priority <- dbGetQuery(poolConn, "select * from fieldwork.tbl_field_test_priority_lookup")
   
   # 1.2: actual UI------------------------
   
@@ -103,16 +103,16 @@ server <- function(input, output, session) {
   #define global variables that will be defined each time server runs
   
   # #capture efficiency high flow types
-  high_flow_type <- dbGetQuery(poolConn, "select * from fieldwork.est_high_flow_efficiency_lookup")
+  high_flow_type <- dbGetQuery(poolConn, "select * from fieldwork.tbl_est_high_flow_efficiency_lookup")
   
   #capture efficiency asset types 
-  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from smpid_facilityid_componentid_inlets_limited where component_id is not null order by asset_type")
+  cet_asset_type <- dbGetQuery(poolConn, "select distinct asset_type from external.mat_assets_ict_limited where component_id is not null order by asset_type")
   
   #con phase
-  con_phase <- dbGetQuery(poolConn, "select * from fieldwork.con_phase_lookup")
+  con_phase <- dbGetQuery(poolConn, "select * from fieldwork.tbl_con_phase_lookup")
   
   #all system ids
-  sys_id <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from smpid_facilityid_componentid")) %>% 
+  sys_id <- odbc::dbGetQuery(poolConn, paste0("select distinct system_id from external.mat_assets")) %>% 
     dplyr::arrange(system_id) %>% 
     dplyr::pull()
   
