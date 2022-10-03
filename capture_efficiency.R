@@ -4,7 +4,7 @@
 #1.0 UI -------
 capture_efficiencyUI <- function(id, label = "capture_efficiency", high_flow_type, priority, html_req, con_phase, future_req, cet_asset_type){
   ns <- NS(id)
-  navbarPage("CET", theme = shinytheme("cerulean"), id = "inTabset",
+  navbarPage("CET",  id = "inTabset", theme = shinytheme("cerulean"),
              #1.1 Add / Edit -------
              tabPanel("Add/Edit Capture Efficiency Test", value = "cet_tab", 
                       useShinyjs(),
@@ -195,7 +195,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.1.4 query and show tables -----
       #get the table of CETs
-      rv$cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full WHERE system_id = '", input$system_id, "'"))
+      rv$cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.viw_capture_efficiency_full WHERE system_id = '", input$system_id, "'"))
       rv$cet_table_db <- reactive(dbGetQuery(poolConn, rv$cet_table_query()))
       rv$cet_table <- reactive(rv$cet_table_db() %>% 
                                  mutate(across(test_date, as.Date)) %>% 
@@ -508,7 +508,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.2 View all CETs ----
       #2.2.1 Query and show tables -----
-      rv$all_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full ORDER BY test_date DESC"))
+      rv$all_query <- reactive(paste0("SELECT * FROM fieldwork.viw_capture_efficiency_full ORDER BY test_date DESC"))
       rv$all_cet_table_db <- reactive(dbGetQuery(poolConn, rv$all_query())) 
       rv$all_cet_table <- reactive(rv$all_cet_table_db() %>% 
                                      mutate(across(where(is.POSIXct), trunc, "days")) %>% 
