@@ -4,7 +4,7 @@
 #1.0 UI -------
 capture_efficiencyUI <- function(id, label = "capture_efficiency", high_flow_type, priority, html_req, con_phase, future_req, cet_asset_type){
   ns <- NS(id)
-  navbarPage("CET", theme = shinytheme("cerulean"), id = "inTabset",
+  navbarPage("CET",  id = "inTabset", theme = shinytheme("cerulean"),
              #1.1 Add / Edit -------
              tabPanel("Add/Edit Capture Efficiency Test", value = "cet_tab", 
                       useShinyjs(),
@@ -100,7 +100,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       #2.1 Add/Edit -----
       #2.1.1 Headers ------
       #Get the Project name, combine it with System ID, and create a reactive header
-      rv$sys_and_name_step <- reactive(odbc::dbGetQuery(poolConn, paste0("select system_id, project_name from project_names where system_id = '", input$system_id, "'")))
+      rv$sys_and_name_step <- reactive(odbc::dbGetQuery(poolConn, paste0("select system_id, project_name from external.mat_project_names where system_id = '", input$system_id, "'")))
       
       rv$sys_and_name <- reactive(paste(rv$sys_and_name_step()$system_id[1], rv$sys_and_name_step()$project_name[1]))
       
@@ -114,7 +114,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.1.2 Querying component IDs ------
       #adjust query to accurately target NULL values once back on main server
-      rv$component_and_asset_query <- reactive(paste0("SELECT component_id, asset_type FROM smpid_facilityid_componentid_inlets_limited WHERE system_id = '", input$system_id, "' AND component_id != 'NULL'"))
+      rv$component_and_asset_query <- reactive(paste0("SELECT component_id, asset_type FROM external.mat_assets_ict_limited WHERE system_id = '", input$system_id, "' AND component_id != 'NULL'"))
       rv$component_and_asset <- reactive(odbc::dbGetQuery(poolConn, rv$component_and_asset_query()))
       
       rv$asset_comp <- reactive(rv$component_and_asset() %>% 
@@ -137,9 +137,9 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       #get facility ID. Either use SMP footprint (for an unknown component) or the facility ID of the existing component
       rv$facility_id <- reactive(if(input$cet_comp_id != ""){
             odbc::dbGetQuery(poolConn, paste0(
-              "SELECT facility_id from smpid_facilityid_componentid_inlets_limited WHERE component_id = '", rv$select_component_id(), "'"))[1,1]
+              "SELECT facility_id from external.mat_assets_ict_limited WHERE component_id = '", rv$select_component_id(), "'"))[1,1]
       }else if(input$system_id != ""){
-        odbc::dbGetQuery(poolConn, paste0("SELECT facility_id from smpid_facilityid_componentid_inlets_limited WHERE component_id is NULL and system_id = '", input$system_id, "' LIMIT 1"))
+        odbc::dbGetQuery(poolConn, paste0("SELECT facility_id from external.mat_assets_ict_limited WHERE component_id is NULL and system_id = '", input$system_id, "' LIMIT 1"))
       }else{
         ""
       }
@@ -149,7 +149,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
     
       #2.1.3 preparing inputs -----
       #lookup priority uid
-      rv$priority_lookup_uid_query <- reactive(paste0("select field_test_priority_lookup_uid from fieldwork.field_test_priority_lookup where field_test_priority = '", input$priority, "'"))
+      rv$priority_lookup_uid_query <- reactive(paste0("select field_test_priority_lookup_uid from fieldwork.tbl_field_test_priority_lookup where field_test_priority = '", input$priority, "'"))
       rv$priority_lookup_uid_step <- reactive(dbGetQuery(poolConn, rv$priority_lookup_uid_query()))
       rv$priority_lookup_uid <- reactive(if(nchar(input$priority) == 0) "NULL" else paste0("'", rv$priority_lookup_uid_step(), "'"))
       
@@ -195,7 +195,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.1.4 query and show tables -----
       #get the table of CETs
-      rv$cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full WHERE system_id = '", input$system_id, "'"))
+      rv$cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.viw_capture_efficiency_full WHERE system_id = '", input$system_id, "'"))
       rv$cet_table_db <- reactive(dbGetQuery(poolConn, rv$cet_table_query()))
       rv$cet_table <- reactive(rv$cet_table_db() %>% 
                                  mutate(across(test_date, as.Date)) %>% 
@@ -221,7 +221,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         ))
       
       #query future CETs
-      future_cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.future_capture_efficiency_full WHERE system_id = '", input$system_id, "' order by field_test_priority_lookup_uid"))
+      future_cet_table_query <- reactive(paste0("SELECT * FROM fieldwork.viw_future_capture_efficiency_full WHERE system_id = '", input$system_id, "' order by field_test_priority_lookup_uid"))
       rv$future_cet_table_db <- reactive(odbc::dbGetQuery(poolConn, future_cet_table_query()))
       
       rv$future_cet_table <- reactive(rv$future_cet_table_db() %>% 
@@ -298,7 +298,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         
         #get facility id
         rv$future_fac <- rv$future_cet_table_db()$facility_id[input$future_cet_table_rows_selected]
-        future_comp_id_query <- paste0("select distinct component_id from smpid_facilityid_componentid_inlets_limited where facility_id = '", rv$future_fac, "' 
+        future_comp_id_query <- paste0("select distinct component_id from external.mat_assets_ict_limited where facility_id = '", rv$future_fac, "' 
             AND component_id IS NOT NULL")
         
         f_comp_id_step <- odbc::dbGetQuery(poolConn, future_comp_id_query) %>% pull()
@@ -334,7 +334,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         #get facility id from table
         rv$fac <- (rv$cet_table_db()$facility_id[input$cet_table_rows_selected])
         #get component id
-        comp_id_query <- paste0("select distinct component_id from smpid_facilityid_componentid_inlets_limited where facility_id = '", rv$fac, "' 
+        comp_id_query <- paste0("select distinct component_id from external.mat_assets_ict_limited where facility_id = '", rv$fac, "' 
             AND component_id IS NOT NULL")
         comp_id_step <- odbc::dbGetQuery(poolConn, comp_id_query) %>% pull()
         #determine whether component id exists and is useful
@@ -371,13 +371,13 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       #add and edit future capture efficiency records
       observeEvent(input$future_cet, {
         if(length(input$future_cet_table_rows_selected) == 0){
-          add_future_cet_query <- paste0("INSERT INTO fieldwork.future_capture_efficiency (system_id, component_id, 
+          add_future_cet_query <- paste0("INSERT INTO fieldwork.tbl_future_capture_efficiency (system_id, component_id, 
                                          facility_id, con_phase_lookup_uid, notes, field_test_priority_lookup_uid, user_input_asset_type) 
                                          VALUES ('", input$system_id, "',", rv$cet_comp_id(), ", '", rv$facility_id(), "', ", rv$phase_null(), "
                                          ,", rv$cet_notes(), ", ", rv$priority_lookup_uid(), ", ", rv$user_input_asset_type(), ")")
           odbc::dbGetQuery(poolConn, add_future_cet_query)
         }else{
-          edit_future_cet_query <- paste0("UPDATE fieldwork.future_capture_efficiency SET component_id = ", rv$cet_comp_id(), ", 
+          edit_future_cet_query <- paste0("UPDATE fieldwork.tbl_future_capture_efficiency SET component_id = ", rv$cet_comp_id(), ", 
                                    facility_id = '",rv$facility_id(), "',
                                    con_phase_lookup_uid = ", rv$phase_null(), ", 
                                    notes = ", rv$cet_notes(), ",
@@ -436,7 +436,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         }
         
         if(length(input$future_cet_table_rows_selected) > 0){
-          odbc::dbGetQuery(poolConn, paste0("DELETE FROM fieldwork.future_capture_efficiency 
+          odbc::dbGetQuery(poolConn, paste0("DELETE FROM fieldwork.tbl_future_capture_efficiency 
                                             WHERE future_capture_efficiency_uid = '", rv$future_cet_table_db()[input$future_cet_table_rows_selected, 1], "'"))
         }
         
@@ -471,7 +471,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       observeEvent(input$confirm_delete_future, {
         odbc::dbGetQuery(poolConn, 
-                         paste0("DELETE FROM fieldwork.future_capture_efficiency WHERE future_capture_efficiency_uid = '",
+                         paste0("DELETE FROM fieldwork.tbl_future_capture_efficiency WHERE future_capture_efficiency_uid = '",
                                 rv$future_cet_table_db()[input$future_cet_table_rows_selected, 1], "'"))
         
         #update future cet table
@@ -508,7 +508,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.2 View all CETs ----
       #2.2.1 Query and show tables -----
-      rv$all_query <- reactive(paste0("SELECT * FROM fieldwork.capture_efficiency_full ORDER BY test_date DESC"))
+      rv$all_query <- reactive(paste0("SELECT * FROM fieldwork.viw_capture_efficiency_full ORDER BY test_date DESC"))
       rv$all_cet_table_db <- reactive(dbGetQuery(poolConn, rv$all_query())) 
       rv$all_cet_table <- reactive(rv$all_cet_table_db() %>% 
                                      mutate(across(where(is.POSIXct), trunc, "days")) %>% 
@@ -553,7 +553,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       
       #2.3.1 query and show table ------
       #unclear why some things need to have () / be reactive and some don't but this works
-      rv$all_future_cet_query <- "SELECT * FROM fieldwork.future_capture_efficiency_full order by field_test_priority_lookup_uid"
+      rv$all_future_cet_query <- "SELECT * FROM fieldwork.viw_future_capture_efficiency_full order by field_test_priority_lookup_uid"
       rv$all_future_cet_table_db <- reactive(odbc::dbGetQuery(poolConn, rv$all_future_cet_query))
       rv$all_future_cet_table <- reactive(rv$all_future_cet_table_db() %>% 
                                             dplyr::select("system_id", "project_name", "component_id", "phase", "asset_type", "field_test_priority",  "notes"))
