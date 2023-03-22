@@ -408,7 +408,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
       observeEvent(input$add_cet, {
         if(length(input$cet_table_rows_selected) == 0){
           #add to capture efficiency
-          add_cet_query <- paste0("INSERT INTO fieldwork.capture_efficiency (system_id, test_date, component_id,
+          add_cet_query <- paste0("INSERT INTO fieldwork.tbl_capture_efficiency (system_id, test_date, component_id,
           facility_id, con_phase_lookup_uid, low_flow_bypass_observed,
           low_flow_efficiency_pct, est_high_flow_efficiency_lookup_uid, high_flow_efficiency_pct, notes, user_input_asset_type)
         	                  VALUES ('", input$system_id, "','",  input$cet_date, "',", rv$cet_comp_id(), ",'", rv$facility_id(), "','", rv$phase(), "', 
@@ -419,7 +419,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
           odbc::dbGetQuery(poolConn, add_cet_query)
         }else{
           #edit capture efficiency
-          edit_cet_query <- paste0("UPDATE fieldwork.capture_efficiency SET system_id = '", input$system_id, "', 
+          edit_cet_query <- paste0("UPDATE fieldwork.tbl_capture_efficiency SET system_id = '", input$system_id, "', 
                                    component_id = ", rv$cet_comp_id(), ", 
                                    facility_id = '",rv$facility_id(), "',
                                    test_date = '", input$cet_date, "', 
