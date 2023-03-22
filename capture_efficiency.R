@@ -4,7 +4,7 @@
 #1.0 UI -------
 capture_efficiencyUI <- function(id, label = "capture_efficiency", high_flow_type, priority, html_req, con_phase, future_req, cet_asset_type){
   ns <- NS(id)
-  navbarPage("CET",  id = "inTabset", theme = shinytheme("cerulean"),
+  navbarPage("CET",  id = "inTabset", #theme = shinytheme("cerulean"),
              #1.1 Add / Edit -------
              tabPanel("Add/Edit Capture Efficiency Test", value = "cet_tab", 
                       useShinyjs(),
