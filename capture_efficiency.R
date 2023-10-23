@@ -360,7 +360,7 @@ capture_efficiencyServer <- function(id, parent_session, poolConn, high_flow_typ
         
         updateDateInput(session, "cet_date", value = rv$cet_table_db()$test_date[input$cet_table_rows_selected])
         updateSelectInput(session, "con_phase", selected = rv$cet_table_db()$phase[input$cet_table_rows_selected])
-        updateSelectInput(session, "low_flow_bypass", selected = rv$cet_table_db()$low_flow_bypass_observed[input$cet_table_rows_selected])
+        updateSelectInput(session, "low_flow_bypass", selected = as.numeric(rv$cet_table_db()$low_flow_bypass_observed[input$cet_table_rows_selected]))
         updateNumericInput(session, "low_flow_efficiency", value = rv$cet_table_db()$low_flow_efficiency_pct[input$cet_table_rows_selected])
         updateSelectInput(session, "est_high_flow_efficiency", selected = rv$cet_table()$est_high_flow_efficiency[input$cet_table_rows_selected])
         updateNumericInput(session, "high_flow_efficiency", value = rv$cet_table_db()$high_flow_efficiency_pct[input$cet_table_rows_selected])
