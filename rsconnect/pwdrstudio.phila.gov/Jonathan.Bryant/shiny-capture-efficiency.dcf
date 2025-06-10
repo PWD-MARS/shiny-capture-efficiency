@@ -1,0 +1,12 @@
+name: shiny-capture-efficiency
+title: shiny-capture-efficiency
+username: Jonathan.Bryant
+account: Jonathan.Bryant
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 514
+bundleId: 3287
+url: https://pwdrstudio.phila.gov/content/98eb37a8-f069-4d62-83dc-c7be21512efb/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
